@@ -93,6 +93,7 @@ nav button .ico{font-size:20px; display:block; margin-bottom:2px;}
 .pat .v{font-weight:700;} .pat .v.down{color:var(--green);} .pat .v.up{color:var(--red);}
 .confetti{position:fixed; top:-30px; font-size:22px; z-index:99; pointer-events:none; animation:fall 1.8s ease-in forwards;}
 @keyframes fall{to{transform:translateY(110vh) rotate(540deg); opacity:.3;}}
+#lockScreen.hidden{display:none !important;}
 #lockScreen{position:fixed; inset:0; z-index:1000; background:linear-gradient(160deg,#2563eb,#60a5fa); display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff;}
 #lockScreen h3{font-size:18px; margin:0 0 6px;}
 #lockScreen .ls-sub{font-size:12px; opacity:.85; margin-bottom:18px;}
@@ -601,7 +602,6 @@ function parseMetrics(text){
   out.subfat=inR(grab(t,'皮下脂肪率'),3,50);
   const t2=t.replace(/皮下脂肪率/g,'####');
   out.fat=inR(grab(t2,'脂肪率'),3,60);
-  // 体重: kg付き数値の最大。ただし目標体重/除脂肪体重/標準体重/筋肉量/骨量の数値は除外
   const kgs=[];
   for(const m of t.matchAll(/(\d{2,3}\.\d{1,2})\s*(?:kg|㎏|Kg|KG)/g)){
     const v=parseFloat(m[1]);
@@ -1025,22 +1025,14 @@ function importData(inp){
   r.readAsText(f);
 }
 
-/* ---------- 初期データ（会話履歴から） ---------- */
-if(!Object.keys(db.days).length){
-  db.days['2026-06-22']={body:{weight:92.45,muscle:72.73,fat:17.2,visceral:12.0,water:59.7},sleep:null,ritual:false,gym:{parts:[],menu:'',sets:[]},meals:{breakfast:[],lunch:[],snack:[],dinner:[],late:[]},note:'全力モード宣言'};
-  db.days['2026-06-23']={body:{weight:92.00,muscle:72.44,fat:17.1,visceral:12.0,subfat:13.9,water:59.8},sleep:null,ritual:false,gym:{parts:[],menu:'',sets:[]},meals:{breakfast:[],lunch:[],snack:[],dinner:[],late:[]},note:''};
-  db.days['2026-06-25']={body:{weight:91.60,muscle:72.19,fat:17.0,visceral:11.0,subfat:13.8,water:59.8},sleep:null,ritual:false,gym:{parts:['脚'],menu:'',sets:[{ex:'スクワット',kg:null,reps:null,sets:null}]},meals:{breakfast:[],lunch:[],snack:[],dinner:[],late:[]},note:'朝スクワット'};
-  save();
-}
-
 /* ---------- PINロック ---------- */
 const PIN_HASH=2085855596;
 function pinHash(s){ let x=5381; for(const c of s){ x=((x*33)^c.charCodeAt(0))>>>0; } return x; }
 (function initLock(){
   let unlocked=false;
-  try{ unlocked=sessionStorage.getItem('ken84_unlock')==='1'; }catch(e){}
-  if(unlocked) return;
+  try{ unlocked=sessionStorage.getItem('ken84_unlock')==='1' || parseInt(localStorage.getItem('ken84_unlock_until')||'0') > Date.now(); }catch(e){}
   const ls=document.getElementById('lockScreen');
+  if(unlocked){ ls.classList.add('hidden'); ls.style.display='none'; return; }
   ls.classList.remove('hidden');
   let buf='';
   const dots=document.getElementById('pinDots');
@@ -1051,7 +1043,11 @@ function pinHash(s){ let x=5381; for(const c of s){ x=((x*33)^c.charCodeAt(0))>>
     if(buf.length<4){ msg.textContent='4桁入れてからOK'; return; }
     if(pinHash(buf)===PIN_HASH){
       ls.classList.add('hidden');
-      try{ sessionStorage.setItem('ken84_unlock','1'); }catch(e){}
+      ls.style.display='none';
+      try{
+        sessionStorage.setItem('ken84_unlock','1');
+        localStorage.setItem('ken84_unlock_until', String(Date.now()+30*86400000));
+      }catch(e){}
     }else{
       dots.classList.add('shake');
       msg.textContent='PINが違う。もう一回';
@@ -1072,6 +1068,14 @@ function pinHash(s){ let x=5381; for(const c of s){ x=((x*33)^c.charCodeAt(0))>>
     pad.appendChild(b);
   });
 })();
+
+/* ---------- 初期データ（会話履歴から） ---------- */
+if(!Object.keys(db.days).length){
+  db.days['2026-06-22']={body:{weight:92.45,muscle:72.73,fat:17.2,visceral:12.0,water:59.7},sleep:null,ritual:false,gym:{parts:[],menu:'',sets:[]},meals:{breakfast:[],lunch:[],snack:[],dinner:[],late:[]},note:'全力モード宣言'};
+  db.days['2026-06-23']={body:{weight:92.00,muscle:72.44,fat:17.1,visceral:12.0,subfat:13.9,water:59.8},sleep:null,ritual:false,gym:{parts:[],menu:'',sets:[]},meals:{breakfast:[],lunch:[],snack:[],dinner:[],late:[]},note:''};
+  db.days['2026-06-25']={body:{weight:91.60,muscle:72.19,fat:17.0,visceral:11.0,subfat:13.8,water:59.8},sleep:null,ritual:false,gym:{parts:['脚'],menu:'',sets:[{ex:'スクワット',kg:null,reps:null,sets:null}]},meals:{breakfast:[],lunch:[],snack:[],dinner:[],late:[]},note:'朝スクワット'};
+  save();
+}
 
 renderAll();
 </script>
