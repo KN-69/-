@@ -148,6 +148,7 @@ nav button .ico{font-size:20px; display:block; margin-bottom:2px;}
     <button class="btn btn-primary" style="width:100%; margin-bottom:6px" onclick="document.getElementById('ocrFile').click()">📷 アプリのスクショから自動入力</button>
     <input type="file" id="ocrFile" class="hidden" accept="image/*" multiple onchange="ocrFiles(this)">
     <div class="small" id="ocrStatus" style="margin-bottom:8px">スクショを選ぶと数値を読み取って下に入れる。間違ってたら直接修正して。</div>
+    <button class="btn btn-ghost btn-small" style="margin-bottom:8px" onclick="copyYesterdayBody()">🔁 昨日の体組成をコピー（変わった所だけ直す）</button>
     <div class="field big-weight" style="margin-bottom:8px">
       <label>体重 kg（これだけでもOK）</label>
       <input type="number" step="0.01" inputmode="decimal" id="f_weight" placeholder="84.00">
@@ -169,6 +170,7 @@ nav button .ico{font-size:20px; display:block; margin-bottom:2px;}
       <div class="field"><label>ボディタイプ</label><input type="text" id="f_bodytype"></div>
       <div class="field"><label>睡眠 時間</label><input type="number" step="0.5" inputmode="decimal" id="f_sleep"></div>
     </div>
+    <button class="btn btn-primary" style="width:100%; margin-top:10px" onclick="saveBody()">✔ 更新（保存する）</button>
   </div>
 
   <div class="card">
@@ -196,6 +198,7 @@ nav button .ico{font-size:20px; display:block; margin-bottom:2px;}
   <div class="card">
     <h2>食事 <span class="small">推定タンパク質 <b id="proteinEst">0</b>g / 目標140g</span></h2>
     <div class="protein-bar"><div id="proteinBar" style="width:0%"></div></div>
+    <button class="btn btn-ghost btn-small" style="margin-top:8px" onclick="copyYesterdayMeals()">🔁 昨日の食事をコピー（違う分だけ直す）</button>
     <div id="mealSlots"></div>
     <div class="chips" id="mealLearned"></div>
   </div>
@@ -250,6 +253,10 @@ nav button .ico{font-size:20px; display:block; margin-bottom:2px;}
   <div class="card">
     <h2>直近7日サマリー <button class="btn btn-ghost btn-small" onclick="copySummary()">Claudeに貼る用をコピー</button></h2>
     <div id="weekTable" style="overflow-x:auto"></div>
+  </div>
+  <div class="card">
+    <h2>1週間の食事一覧</h2>
+    <div id="weekMeals" style="overflow-x:auto"></div>
   </div>
   <div class="card">
     <h2>今週の達成状況</h2>
@@ -428,6 +435,29 @@ function renderGym(d){
   });
 }
 
+function copyYesterdayBody(){
+  const y=new Date(cur+'T00:00'); y.setDate(y.getDate()-1);
+  const src=db.days[isoLocal(y)];
+  if(!src||!src.body||Object.keys(src.body).every(k=>src.body[k]==null)){ toast('昨日の体組成記録がない'); return; }
+  const d=getDay(cur);
+  Object.entries(src.body).forEach(([k,v])=>{ if(v!=null&&d.body[k]==null) d.body[k]=v; });
+  if(d.sleep==null&&src.sleep!=null) d.sleep=src.sleep;
+  save(); renderToday(); toast('昨日の値をコピーした。体重だけ今日の数字に直して');
+}
+function saveBody(){
+  const d=getDay(cur);
+  deriveBody(d.body);
+  save(); renderToday();
+  toast('✅ 体組成を保存した');
+}
+function copyYesterdayMeals(){
+  const y=new Date(cur+'T00:00'); y.setDate(y.getDate()-1);
+  const src=db.days[isoLocal(y)];
+  if(!src||!Object.values(src.meals||{}).some(a=>a.length)){ toast('昨日の食事記録がない'); return; }
+  const d=getDay(cur);
+  SLOTS.forEach(([k])=>{ (src.meals[k]||[]).forEach(m=>{ if(!d.meals[k].includes(m)) d.meals[k].push(m); }); });
+  save(); renderToday(); toast('昨日の食事をコピーした');
+}
 function renderMeals(d){
   const box=document.getElementById('mealSlots'); box.innerHTML='';
   SLOTS.forEach(([key,label])=>{
@@ -950,6 +980,16 @@ function renderWeek(){
     html+='<tr><td>'+fmtD(x)+'</td><td>'+(d&&d.body.weight!=null?d.body.weight.toFixed(2):'')+'</td><td>'+(d&&d.ritual?'✅':'')+'</td><td>'+gym+'</td><td>'+(d?(estProtein(d)||''):'')+'</td><td>'+(d&&d.note?d.note.slice(0,10):'')+'</td></tr>';
   });
   document.getElementById('weekTable').innerHTML=html+'</table>';
+  // 食事一覧(日×朝昼間食夜寝る前)
+  let mh='<table><tr><th>日</th>'+SLOTS.map(([,l])=>'<th>'+l+'</th>').join('')+'</tr>';
+  ds.forEach(x=>{
+    const d=db.days[x];
+    mh+='<tr><td>'+fmtD(x)+'</td>'+SLOTS.map(([k])=>{
+      const items=(d&&d.meals&&d.meals[k])||[];
+      return '<td style="text-align:left; min-width:72px">'+items.join('、')+'</td>';
+    }).join('')+'</tr>';
+  });
+  document.getElementById('weekMeals').innerHTML=mh+'</table>';
   const gymN=weeklyGymCount(today());
   const ritualN=ds.filter(x=>db.days[x]&&db.days[x].ritual).length;
   const recN=ds.filter(x=>db.days[x]&&db.days[x].body.weight!=null).length;
