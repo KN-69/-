@@ -278,6 +278,7 @@ nav button .ico{font-size:20px; display:block; margin-bottom:2px;}
   <div class="ls-sub">PINを入力</div>
   <div class="pin-dots" id="pinDots"><i></i><i></i><i></i><i></i></div>
   <div class="pin-pad" id="pinPad"></div>
+  <div class="ls-sub" id="pinMsg" style="margin-top:14px;min-height:16px"></div>
 </div>
 
 <script>
@@ -312,7 +313,11 @@ function load(){
   try{ const d = JSON.parse(localStorage.getItem(KEY)); if(d && d.days) return d; }catch(e){}
   return {days:{}};
 }
-function save(){ localStorage.setItem(KEY, JSON.stringify(db)); }
+let warnedStorage=false;
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(db)); }
+  catch(e){ if(!warnedStorage){ warnedStorage=true; alert('注意: このブラウザモードでは記録を保存できない(プライベートブラウズ?)。通常モードのSafariで開いて。'); } }
+}
 function isoLocal(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function today(){ return isoLocal(new Date()); }
 function emptyDay(){ return {body:{}, sleep:null, ritual:false, gym:{parts:[],menu:'',sets:[]}, meals:{breakfast:[],lunch:[],snack:[],dinner:[],late:[]}, note:''}; }
@@ -1032,30 +1037,37 @@ if(!Object.keys(db.days).length){
 const PIN_HASH=2085855596;
 function pinHash(s){ let x=5381; for(const c of s){ x=((x*33)^c.charCodeAt(0))>>>0; } return x; }
 (function initLock(){
-  if(sessionStorage.getItem('ken84_unlock')==='1') return;
+  let unlocked=false;
+  try{ unlocked=sessionStorage.getItem('ken84_unlock')==='1'; }catch(e){}
+  if(unlocked) return;
   const ls=document.getElementById('lockScreen');
   ls.classList.remove('hidden');
   let buf='';
   const dots=document.getElementById('pinDots');
   const drawDots=()=>{ [...dots.children].forEach((el,i)=>el.classList.toggle('f',i<buf.length)); };
   const pad=document.getElementById('pinPad');
-  ['1','2','3','4','5','6','7','8','9','','0','⌫'].forEach(k=>{
+  const check=()=>{
+    const msg=document.getElementById('pinMsg');
+    if(buf.length<4){ msg.textContent='4桁入れてからOK'; return; }
+    if(pinHash(buf)===PIN_HASH){
+      ls.classList.add('hidden');
+      try{ sessionStorage.setItem('ken84_unlock','1'); }catch(e){}
+    }else{
+      dots.classList.add('shake');
+      msg.textContent='PINが違う。もう一回';
+      setTimeout(()=>{ dots.classList.remove('shake'); buf=''; drawDots(); },400);
+    }
+  };
+  ['1','2','3','4','5','6','7','8','9','⌫','0','OK'].forEach(k=>{
     const b=document.createElement('button');
     b.textContent=k;
-    if(k==='') b.style.visibility='hidden';
+    if(k==='OK'){ b.style.background='#16a34a'; b.style.fontSize='20px'; }
     b.onclick=()=>{
+      document.getElementById('pinMsg').textContent='';
+      if(k==='OK'){ check(); return; }
       if(k==='⌫'){ buf=buf.slice(0,-1); drawDots(); return; }
       if(buf.length>=4) return;
       buf+=k; drawDots();
-      if(buf.length===4){
-        if(pinHash(buf)===PIN_HASH){
-          sessionStorage.setItem('ken84_unlock','1');
-          ls.classList.add('hidden');
-        }else{
-          dots.classList.add('shake');
-          setTimeout(()=>{ dots.classList.remove('shake'); buf=''; drawDots(); },400);
-        }
-      }
     };
     pad.appendChild(b);
   });
