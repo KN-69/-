@@ -150,7 +150,7 @@ nav button .ico{font-size:20px; display:block; margin-bottom:2px;}
     <div class="small" id="ocrStatus" style="margin-bottom:8px">スクショを選ぶと数値を読み取って下に入れる。間違ってたら直接修正して。</div>
     <div class="field big-weight" style="margin-bottom:8px">
       <label>体重 kg（これだけでもOK）</label>
-      <input type="number" step="0.01" inputmode="decimal" id="f_weight" placeholder="91.60">
+      <input type="number" step="0.01" inputmode="decimal" id="f_weight" placeholder="84.00">
     </div>
     <div class="grid2">
       <div class="field"><label>筋肉量 kg</label><input type="number" step="0.01" inputmode="decimal" id="f_muscle"></div>
@@ -691,7 +691,13 @@ function renderGymStatus(){
   const now=new Date();
   const st=gymStatus(now);
   const nc=nextClosure(now);
-  const ncTxt=nc?'次の休館日: '+(nc.getMonth()+1)+'/'+nc.getDate()+'(月)'+((nc.getMonth()===6||nc.getMonth()===8)?' ※第3月曜が祝日のため第4月曜':''):'';
+  let ncTxt='';
+  if(nc){
+    const reopen=new Date(nc); reopen.setDate(nc.getDate()+1);
+    ncTxt='次の休館日: '+(nc.getMonth()+1)+'/'+nc.getDate()+'(月)'
+      +((nc.getMonth()===6||nc.getMonth()===8)?' ※第3月曜が祝日のため第4月曜':'')
+      +' → '+(reopen.getMonth()+1)+'/'+reopen.getDate()+'(火) 7:00 開館';
+  }
   document.getElementById('gymStatus').innerHTML=
     '<div class="advice '+(st.open?'good':'alert')+'" style="margin-bottom:0">'+
     (st.open?'🟢':'🔴')+' ゴールドジム笹塚: '+st.msg+'<br><span class="small">'+ncTxt+'</span></div>';
@@ -1069,11 +1075,10 @@ function pinHash(s){ let x=5381; for(const c of s){ x=((x*33)^c.charCodeAt(0))>>
   });
 })();
 
-/* ---------- 初期データ（会話履歴から） ---------- */
-if(!Object.keys(db.days).length){
-  db.days['2026-06-22']={body:{weight:92.45,muscle:72.73,fat:17.2,visceral:12.0,water:59.7},sleep:null,ritual:false,gym:{parts:[],menu:'',sets:[]},meals:{breakfast:[],lunch:[],snack:[],dinner:[],late:[]},note:'全力モード宣言'};
-  db.days['2026-06-23']={body:{weight:92.00,muscle:72.44,fat:17.1,visceral:12.0,subfat:13.9,water:59.8},sleep:null,ritual:false,gym:{parts:[],menu:'',sets:[]},meals:{breakfast:[],lunch:[],snack:[],dinner:[],late:[]},note:''};
-  db.days['2026-06-25']={body:{weight:91.60,muscle:72.19,fat:17.0,visceral:11.0,subfat:13.8,water:59.8},sleep:null,ritual:false,gym:{parts:['脚'],menu:'',sets:[{ex:'スクワット',kg:null,reps:null,sets:null}]},meals:{breakfast:[],lunch:[],snack:[],dinner:[],late:[]},note:'朝スクワット'};
+/* ---------- 2026-07-06 本スタート: 6月の仮データは削除(記録は今日から) ---------- */
+if(!db.seedCleared){
+  ['2026-06-22','2026-06-23','2026-06-25'].forEach(k=>delete db.days[k]);
+  db.seedCleared=true;
   save();
 }
 
